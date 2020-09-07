@@ -12,5 +12,6 @@ pyvenv.cfg
 pip-selfcheck.json
 
 # 自分で追加
+isea_venv/
 datasets/
 datasets.zip
