@@ -1,0 +1,18 @@
+@charset "utf-8";
+
+table {
+    margin-bottom:1em;
+    border-collapse:collapse;
+    border:1px ridge #ddd;
+}
+table tr:nth-child(2n-1) {
+    background-color:#f3f6f6;
+}
+table tr:nth-child(2n) {
+    background-color:white;
+}
+table th{
+    background-color: cornflowerblue;
+}
+/* table tr:nth-child(1) {
+    background-color:#9fafb8; */

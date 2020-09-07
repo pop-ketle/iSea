@@ -1,0 +1,308 @@
+{% extends "layout.html" %}
+{% block content %}
+<h1>iSea: 海況と漁獲データの結びつけによる関連性の可視化</h1>
+<p>{{ message }}</p>
+
+{% if plotly_div %}
+{{ plotly_div | safe }}
+{% endif %}
+
+{% if seed_img %}
+<div>
+    <table border="1">
+        <thead>
+            <tr valign="top">
+                <th colspan=2>選択画像</th>
+                {% if masked_img %}
+                <th colspan=1>高類似度ゾーン</th>
+                {% endif %}
+                {% if positive_masked_img %}
+                <th colspan=1>ポジティブデータとの類似度<br>ポジティブデータ数{{ nn_positive_data | length }}</th>
+                {% endif %}
+                {% if negative_masked_img %}
+                <th colspan=1>ネガティブデータとの類似度<br>ネガティブデータ数{{ nn_negative_data | length }}</th>
+                {% endif %}
+                <!-- <th colspan=10>類似度指標選択</th> -->
+            </tr>
+        </thead>
+
+        <tbody>
+        <tr>
+            <form action="/img_details" method="POST" enctype="multipart/form-data" name="select_metric">
+                類似度評価指標選択<p></p>
+                <input type="hidden" name="place" value="{{ place }}">
+                <input type="hidden" name="method" value="{{ method }}">
+                <input type="hidden" name="species" value="{{ species }}">
+                <input type="hidden" name="threshold" value="{{ threshold }}">
+                <input type="hidden" name="date" value="{{ date }}">
+
+                <select name="sim_metric">
+                    {% if sim_metric=="ssim" %} <option value=ssim selected>ssim</option>
+                    {% else %} <option value=ssim>ssim</option>{% endif %}
+                    {% if sim_metric=="psnr" %} <option value=psnr selected>psnr</option>
+                    {% else %} <option value=psnr>psnr</option>{% endif %}
+                    {% if sim_metric=="rmse" %} <option value=rmse selected>rmse</option>
+                    {% else %} <option value=rmse>rmse</option>{% endif %}
+                    {% if sim_metric=="scaled_avg" %} <option value=scaled_avg selected>scaled_avg</option>
+                    {% else %} <option value=scaled_avg>scaled_avg</option>{% endif %}
+                </select>
+                <!-- <label><input type="radio" name="metric" value="scaled_avg" checked>scaled_avg</label>
+                <label><input type="radio" name="metric" value="ssim">ssim</label>
+                <label><input type="radio" name="metric" value="psnr">psnr</label>
+                <label><input type="radio" name="metric" value="rmse">rmse</label> -->
+                <input type="submit" value="類似度指標決定">
+            </form>
+        <tr>
+
+        <p></p>
+
+        {% for i, path, catch, date, dis in seed_img %}
+        <form action="/img_details" method="POST" enctype="multipart/form-data" name="select_image">
+            <td>
+                <input type="hidden" name="place" value="{{ place }}">
+                <input type="hidden" name="method" value="{{ method }}">
+                <input type="hidden" name="species" value="{{ species }}">
+                <input type="hidden" name="threshold" value="{{ threshold }}">
+
+                <input type="hidden" name="date" value="{{ date }}">
+                No.{{ i }}<br>
+                <input type="image" alt="not found image of '{{ date }}''" src="{{ path }}" width="300" height="350" style="margin-top: 10px; vertical-align: bottom;">
+            </td>
+
+            <td>
+                日付:<br>{{ date }}<br>
+                漁獲量:<br>{{ catch }}(kg)
+            </td>
+        </form>
+        {% endfor %}
+        {% if masked_img %}
+            <td><input type="image" alt="not found masked_img'" src="{{ masked_img }}" width="300" height="350" style="margin-top: 10px; vertical-align: bottom;"></td>
+        {% endif %}
+        {% if positive_masked_img %}
+        <td><input type="image" alt="not found positive_masked_img'" src="{{ positive_masked_img }}" width="300" height="350" style="margin-top: 10px; vertical-align: bottom;"></td>
+        {% endif %}
+        {% if negative_masked_img %}
+        <td><input type="image" alt="not found negative_masked_img'" src="{{ negative_masked_img }}" width="300" height="350" style="margin-top: 10px; vertical-align: bottom;"></td>
+        {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if nn_positive_data %}
+<div>
+    <table border="1">
+        <thead>
+            <tr valign="top">
+                <th colspan={{ nn_positive_data | length * 2}}>ポジティブ類似画像</th>
+            </tr>
+        </thead>
+
+        <tbody>
+        {% for i, path, catch, date, n_dis in nn_positive_data %}
+        <form action="/img_details" method="POST" enctype="multipart/form-data" name="select_image">
+        {% if (loop.index0%5)==0 %}<tr>{% endif %}
+            <td>
+                <input type="hidden" name="place" value="{{ place }}">
+                <input type="hidden" name="method" value="{{ method }}">
+                <input type="hidden" name="species" value="{{ species }}">
+                <input type="hidden" name="threshold" value="{{ threshold }}">
+
+                <input type="hidden" name="date" value="{{ date }}">
+                No.{{ i }}<br>
+                類似度:{{ n_dis }}<br>
+                <input type="image" alt="not found image of '{{ date }}''" src="{{ path }}" width="140" height="180" style="margin-top: 10px; vertical-align: bottom;">
+            </td>
+
+            <td>
+                日付:<br>{{ date }}<br>
+                漁獲量:<br>{{ catch }}(kg)
+            </td>
+        <!-- {% if (loop.index%10)==0 %}</tr>{% endif %} -->
+        </form>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if nn_negative_data %}
+<div>
+    <table border="1">
+        <thead>
+            <tr valign="top">
+                <th colspan={{ nn_negative_data | length * 2}}>ネガティブ類似画像</th>
+            </tr>
+        </thead>
+
+        <tbody>
+        {% for i, path, catch, date, n_dis in nn_negative_data %}
+        <form action="/img_details" method="POST" enctype="multipart/form-data" name="select_image">
+        {% if (loop.index0%5)==0 %}<tr>{% endif %}
+            <td>
+                <input type="hidden" name="place" value="{{ place }}">
+                <input type="hidden" name="method" value="{{ method }}">
+                <input type="hidden" name="species" value="{{ species }}">
+                <input type="hidden" name="threshold" value="{{ threshold }}">
+                
+                <input type="hidden" name="date" value="{{ date }}">
+                No.{{ i }}<br>
+                類似度:{{ n_dis }}<br>
+                <input type="image" alt="not found image of '{{ date }}''" src="{{ path }}" width="140" height="180" style="margin-top: 10px; vertical-align: bottom;">
+            </td>
+
+            <td>
+                日付:<br>{{ date }}<br>
+                漁獲量:<br>{{ catch }}(kg)
+            </td>
+        </form>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if removed_data %}
+<div>
+    <table border="1">
+        <thead>
+            <tr valign="top">
+                <th colspan={{ removed_data | length * 2}}>漁に行かなかった時の類似画像</th>
+            </tr>
+        </thead>
+
+        <tbody>
+        {% for i, path, catch, date, n_dis in removed_data %}
+        <form action="/img_details" method="POST" enctype="multipart/form-data" name="select_image">
+        {% if (loop.index0%5)==0 %}<tr>{% endif %}
+            <td>
+                <input type="hidden" name="place" value="{{ place }}">
+                <input type="hidden" name="method" value="{{ method }}">
+                <input type="hidden" name="species" value="{{ species }}">
+                <input type="hidden" name="threshold" value="{{ threshold }}">
+                <input type="hidden" name="date" value="{{ date }}">
+                No.{{ i }}<br>
+                類似度:{{ n_dis }}<br>
+                <input type="image" alt="not found image of '{{ date }}''" src="{{ path }}" width="140" height="180" style="margin-top: 10px; vertical-align: bottom;">
+            </td>
+
+            <td>
+                日付:<br>{{ date }}<br>
+                漁獲量:<br>{{ catch }}(kg)
+            </td>
+        </form>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if nn_upper_data %}
+<div>
+    <table border="1">
+        <thead>
+            <tr valign="top">
+                <th colspan={{ nn_upper_data | length * 2}}>上層近傍</th>
+            </tr>
+        </thead>
+
+        <tbody>
+        {% for i, n_path, n_catch, n_date, n_dis in nn_upper_data %}
+        <form action="/img_details" method="POST" enctype="multipart/form-data" name="select_image">
+        {% if (loop.index0%5)==0 %}<tr>{% endif %}
+            <td>
+                <input type="hidden" name="place" value="{{ place }}">
+                <input type="hidden" name="method" value="{{ method }}">
+                <input type="hidden" name="species" value="{{ species }}">
+                <input type="hidden" name="upper" value="{{ upper }}">
+                <input type="hidden" name="lower" value="{{ lower }}">
+                <input type="hidden" name="date" value="{{ n_date }}">
+                No.{{ i }}<br>
+                類似度:{{ n_dis }}<br>
+                <input type="image" alt="not found image of '{{ n_date }}''" src="{{ n_path }}" width="140" height="180" style="margin-top: 10px; vertical-align: bottom;">
+            </td>
+
+            <td>
+                日付:<br>{{ n_date }}<br>
+                漁獲量:<br>{{ n_catch }}(kg)
+            </td>
+        </form>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if nn_middle_data %}
+<div>
+    <table border="1">
+        <thead>
+            <tr valign="top">
+                <th colspan={{ nn_middle_data | length * 2}}>中層近傍</th>
+            </tr>
+        </thead>
+
+        <tbody>
+        {% for i, n_path, n_catch, n_date, n_dis in nn_middle_data %}
+        <form action="/img_details" method="POST" enctype="multipart/form-data" name="select_image">
+        {% if (loop.index0%5)==0 %}<tr>{% endif %}
+            <td>
+                <input type="hidden" name="place" value="{{ place }}">
+                <input type="hidden" name="method" value="{{ method }}">
+                <input type="hidden" name="species" value="{{ species }}">
+                <input type="hidden" name="upper" value="{{ upper }}">
+                <input type="hidden" name="lower" value="{{ lower }}">
+                <input type="hidden" name="date" value="{{ n_date }}">
+                No.{{ i }}<br>
+                類似度:{{ n_dis }}<br>
+                <input type="image" alt="not found image of '{{ n_date }}''" src="{{ n_path }}" width="140" height="180" style="margin-top: 10px; vertical-align: bottom;">
+            </td>
+
+            <td>
+                日付:<br>{{ n_date }}<br>
+                漁獲量:<br>{{ n_catch }}(kg)
+            </td>
+        </form>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if nn_lower_data %}
+<div>
+    <table border="1">
+        <thead>
+            <tr valign="top">
+                <th colspan={{ nn_lower_data | length * 2 }}>下層近傍</th>
+            </tr>
+        </thead>
+
+        <tbody>
+        {% for i, n_path, n_catch, n_date, n_dis in nn_lower_data %}
+        <form action="/img_details" method="POST" enctype="multipart/form-data" name="select_image">
+        {% if (loop.index0%5)==0 %}<tr>{% endif %}
+            <td>
+                <input type="hidden" name="place" value="{{ place }}">
+                <input type="hidden" name="method" value="{{ method }}">
+                <input type="hidden" name="species" value="{{ species }}">
+                <input type="hidden" name="upper" value="{{ upper }}">
+                <input type="hidden" name="lower" value="{{ lower }}">
+                <input type="hidden" name="date" value="{{ n_date }}">
+                No.{{ i }}<br>
+                類似度:{{ n_dis }}<br>
+                <input type="image" alt="not found image of '{{ n_date }}''" src="{{ n_path }}" width="140" height="180" style="margin-top: 10px; vertical-align: bottom;">
+            </td>
+
+            <td>
+                日付:<br>{{ n_date }}<br>
+                漁獲量:<br>{{ n_catch }}(kg)
+            </td>
+        </form>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% endblock %}

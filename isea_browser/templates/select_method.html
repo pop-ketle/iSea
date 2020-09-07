@@ -1,0 +1,26 @@
+{% extends "layout.html" %}
+{% block content %}
+<h1>iSea: 海況と漁獲データの結びつけによる関連性の可視化</h1>
+<p>{{ message }}</p>
+
+{% if methods %}
+<form action="/select_species" method="POST" enctype="multipart/form-data">
+    <p>漁業種類選択</p>
+    <select name="place">
+        <option value={{ place }}>{{ place }}</option>
+    </select>
+
+    <select name="method">
+        <option value="null" disabled selected>選択して下さい</option>
+        {% for method in methods %}
+        <option value={{ method }}>{{ method }}</option>
+        {% endfor %}
+    </select>
+    
+    <p></p>
+    <div>
+        <input type="submit" value="ok">
+    </div>
+    </form>
+{% endif %}
+{% endblock %}

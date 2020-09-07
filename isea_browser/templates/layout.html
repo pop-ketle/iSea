@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="utf-8">
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+        <script src="{{url_for('static', filename='js/script.js') }}"></script>
+        <script src="{{url_for('static', filename='js/plotly_click.js') }}"></script>
+        <title>iSea</title>
+    </head>
+    <body>
+        <form action="/" method="POST" enctype="multipart/form-data">
+            <input type="submit" value="リセット">
+        </form>
+        
+        <hr>
+        {% block content %}
+        {% endblock %}
+    </body>
+</html>

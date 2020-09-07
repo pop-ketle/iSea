@@ -1,0 +1,110 @@
+{% extends "layout.html" %}
+{% block content %}
+<h1>iSea: 海況と漁獲データの結びつけによる関連性の可視化</h1>
+<p>漁獲量のデータは最大で2012/01/01~2018/12/31までの範囲です。</p>
+<p>{{ message }}</p>
+
+<form action="/simple_graph" method="POST" enctype="multipart/form-data">
+    <p>グラフ</p>
+    <select name="place">
+        <option value={{ place }}>{{ place }}</option>
+    </select>
+    <select name="method">
+        <option value={{ method }}>{{ method }}</option>
+    </select>
+    <select name="species">
+        <option value={{ species }}>{{ species }}</option>
+    </select>
+    
+    <p></p>
+    漁獲量探索開始日<input type="date" name="startdate" min="2012-01-01" max="2018-12-31", value="{{ startdate }}">
+    漁獲量探索終了日<input type="date" name="enddate" min="2012-01-01" max="2018-12-31", value="{{ enddate }}">
+    <p></p>
+
+    閾値:<input type="text" name="threshold" size="10" maxlength="10" value={{ threshold }}>(kg)
+    画像サンプリング数:<input type="text" name="num_sample" size="1" maxlength="2" value={{ num_sample }}>(個)
+    <p></p>
+    <div>
+        <input type="submit" value="ok">
+    </div>
+</form>
+
+{% if plotly_div %}
+{{ plotly_div | safe }}
+{% endif %}
+
+{% if positive_data %}
+<div>
+    <table border="1">
+        <thead>
+            <tr valign="top">
+                <th colspan={{ positive_data | length * 2 }}>ポジティブデータサンプル</th>
+            </tr>
+        </thead>
+        
+        <tbody>
+            {% for path, catch, date in positive_data %}
+            <!-- 一つの画像毎にフォームを作ることでちゃんと選択した画像に飛べる様にしているのでここの移動はNG -->
+            <form action="/img_details" method="POST" enctype="multipart/form-data" target="_blank" name="select_image">
+            {% if (loop.index0%5)==0 %}<tr>{% endif %}
+            <td>
+                <input type="hidden" name="place" value="{{ place }}">
+                <input type="hidden" name="method" value="{{ method }}">
+                <input type="hidden" name="species" value="{{ species }}">
+                <input type="hidden" name="threshold" value="{{ threshold }}">
+                <input type="hidden" name="startdate" value="{{ startdate }}">
+                <input type="hidden" name="enddate" value="{{ enddate }}">
+
+                <input type="hidden" name="date" value="{{ date }}">
+                <input type="image" alt="not found image of '{{ date }}''" src="{{ path }}" width="140" height="180" style="margin-top: 10px; vertical-align: bottom;">
+            </td>
+
+            <td>
+                日付:<br>{{ date }}<br>
+                漁獲量:<br>{{ catch }}(kg)
+            </td>
+        </form>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if negative_data %}
+<div>
+    <table border="1">
+        <thead>
+            <tr valign="top">
+                <th colspan={{ negative_data | length * 2 }}>ネガティブデータサンプル</th>
+            </tr>
+        </thead>
+        
+        <tbody>
+            {% for path, catch, date in negative_data %}
+            <!-- 一つの画像毎にフォームを作ることでちゃんと選択した画像に飛べる様にしているのでここの移動はNG -->
+            <form action="/img_details" method="POST" enctype="multipart/form-data" target="_blank" name="select_image">
+            {% if (loop.index0%5)==0 %}<tr>{% endif %}
+            <td>
+                <input type="hidden" name="place" value="{{ place }}">
+                <input type="hidden" name="method" value="{{ method }}">
+                <input type="hidden" name="species" value="{{ species }}">
+                <input type="hidden" name="threshold" value="{{ threshold }}">
+                <input type="hidden" name="startdate" value="{{ startdate }}">
+                <input type="hidden" name="enddate" value="{{ enddate }}">
+                
+                <input type="hidden" name="date" value="{{ date }}">
+                <input type="image" alt="not found image of '{{ date }}''" src="{{ path }}" width="140" height="180" style="margin-top: 10px; vertical-align: bottom;">
+            </td>
+
+            <td>
+                日付:<br>{{ date }}<br>
+                漁獲量:<br>{{ catch }}(kg)
+            </td>
+        </form>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% endblock %}
