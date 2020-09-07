@@ -8,14 +8,19 @@ iSea: 海況と漁獲データの結びつけによる関連性の可視化
 $ git clone https://github.com/pop-ketle/iSea.git
 ```
 
+- 作業ディレクトリの移動
+```zsh
+$ cd iSea
+```
+
 - 仮想環境作成
 ```zsh
-$ python -m venv isea
+$ python3 -m venv isea_venv
 ```
 
 - 仮想環境に入る
 ```zsh
-$ . bin/activate
+$ . isea_venv/bin/activate
 ```
 
 ## 必要ライブラリをインストール
@@ -38,7 +43,10 @@ $ cd isea_browser
 $ python isea.py
 ```
 
-<!-- ## 備考
-### スクレイピングするスクリプトはまだ調整中なので触らないでください。 -->
-<!-- git 管理におかなければいいか -->
+- ローカルホストにアクセス
+基本、http://localhost:5000/ に立つと思います。
+
+## 備考
+- スクレイピングするスクリプト
+scraperフォルダはまだ調整中なので触らないでください。漁獲情報のスクレイピング自体は多分できます。
 
