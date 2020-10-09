@@ -15,3 +15,6 @@ pip-selfcheck.json
 isea_venv/
 datasets/
 datasets.zip
+
+__pycache__
+.DS_Store
