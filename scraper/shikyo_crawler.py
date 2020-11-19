@@ -159,24 +159,25 @@ def web_crawl_and_scrape(reset=False):
     if reset:
         os.remove(DATABASE_PATH+'data.db')
 
-        con = sqlite3.connect(DATABASE_PATH+'data.db')
-        c   = con.cursor()
-        create_table = '''
-            CREATE TABLE IF NOT EXISTS data (
-                場所 text, 日付 text, 漁業種類 text,
-                隻数 int, 魚種 text, 規格 text,
-                本数 int, 水揚量 int,
-                高値 int, 平均値 int, 安値 int,
-                primary key(場所,日付,漁業種類,魚種)
-            )'''
-        c.execute(create_table)
-        con.commit()
-        con.close()
+    con = sqlite3.connect(DATABASE_PATH+'data.db')
+    c   = con.cursor()
+    create_table = '''
+        CREATE TABLE IF NOT EXISTS data (
+            場所 text, 日付 text, 漁業種類 text,
+            隻数 int, 魚種 text, 規格 text,
+            本数 int, 水揚量 int,
+            高値 int, 平均値 int, 安値 int,
+            primary key(場所,日付,漁業種類,魚種)
+        )'''
+    c.execute(create_table)
+    con.commit()
+    con.close()
 
     # NOTE: 一応ファイルがない場合に備えて例外処理書いた方がいい気もするけど、前の関数で.pkl作成するから大丈夫だろの精神
     with open(DAILY_URLS_DICT, 'rb') as f: daily_urls_dict = pickle.load(f)
 
     # 差分だけ追加するために、すでにデータベースに存在している'年-月'のsetを作る
+    # FIXME: 結局これだと全部なめてる気がするけど、湾ごとにデータを格納する必要があるのでそのための処理が面倒なので後回し
     con = sqlite3.connect(DATABASE_PATH+'data.db')
     c   = con.cursor()
     c.execute('SELECT 日付 from data GROUP BY 日付')
