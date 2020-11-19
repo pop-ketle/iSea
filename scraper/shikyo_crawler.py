@@ -255,4 +255,4 @@ if __name__ == "__main__":
 
     # 岩手大漁ナビのサイトをクロールする reset=Trueならデータベースを削除して初期化
     # 差分を見て月単位でスクレイピングするようになっているので、バグがあった場合、意図せず日単位だとデータに抜けが生じる可能性があるかも
-    web_crawl_and_scrape(reset=True)
+    web_crawl_and_scrape(reset=False)
