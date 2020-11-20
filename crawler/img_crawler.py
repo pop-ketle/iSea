@@ -67,8 +67,13 @@ def scrape_img(img_class):
     # 画像データを持ってない年のlist
     diff_exist_years = list(site_exist_years - data_exist_years)
     diff_exist_years = sorted([int(year) for year in diff_exist_years], reverse=True)
+
     # 画像データを持ってない一番若い年の一年前の分もスクレイピングし直すことで抜けがないようにする
-    diff_exist_years.append(diff_exist_years[-1] - 1)
+    # 差分がない時は一番新しい年の画像データを再スクレイピングする
+    if len(diff_exist_years)==0:
+        diff_exist_years.append(int(sorted(data_exist_years)[-1]))
+    else:
+        diff_exist_years.append(diff_exist_years[-1] - 1)
 
     start = datetime.strptime(f'{diff_exist_years[-1]}-01-01', '%Y-%m-%d')
     end   = datetime.strptime(f'{diff_exist_years[0]}-12-31', '%Y-%m-%d')
