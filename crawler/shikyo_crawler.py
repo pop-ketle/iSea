@@ -29,7 +29,7 @@ MAX_CNT        = 3 # データベースの最大アーカイブ数
 
 # スクレイピングする先のURLを保存したdict
 MONTHLY_URLS_DICT = './shikyo_monthly_urls_dict.pkl'
-DAILY_URLS_DICT   = './shikyo_daily_urls_dict'
+DAILY_URLS_DICT   = './shikyo_daily_urls_dict.pkl'
 
 ###################################
 
