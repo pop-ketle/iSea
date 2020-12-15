@@ -5,9 +5,14 @@ import pandas as pd
 import configparser
 import streamlit as st
 from datetime import datetime as dt
+from datetime import timedelta
 
 import plotly.graph_objs as go
 
+
+def daterange(_start, _end):
+    for n in range((_end - _start).days+1):
+        yield _start + timedelta(n)
 
 def select_place_method_species(methods_dict, species_dict):
     '''漁港、漁業手法、魚種を選択するサイドバーを作り、選択された漁港、漁業手法、魚種を返す
@@ -31,6 +36,8 @@ def select_place_method_species(methods_dict, species_dict):
     species= st.sidebar.selectbox(
         '漁業手法選択',
         list(species_dict[f'{place}:{method}']))
+
+    st.write(f'You selected: {place} {method} {species}', )
 
     return place, method, species
 
@@ -65,9 +72,6 @@ def make_timeline_catch_graph(place, method, species, db_path):
     # dbのカラム名を列名にして、pd.DataFrame化
     data_df = pd.DataFrame(data, columns=[s[0] for s in con.execute('select * from data').description])
     data_df['日付'] = data_df['日付'].astype('datetime64[ns]')
-    print(data_df)
-
-    print(place)
 
     # データベースに無い日付を補完するためのpd.DataFrameを作成して補完
     _df = pd.DataFrame(pd.date_range(start_date, end_date, freq='D'), columns=['日付'])
@@ -76,8 +80,30 @@ def make_timeline_catch_graph(place, method, species, db_path):
     data_df['漁業種類'].fillna(method, inplace=True)
     data_df['魚種'].fillna(method, inplace=True)
 
+    # 欠損値を-1で埋める
+    data_df.fillna(-1, inplace=True)
     print(data_df)
 
+    # Plotlyのグラフを突っ込むリスト
+    traces = []
+    # 漁獲量の折れ線グラフ
+    traces.append(go.Scatter(x=list(daterange(start_date, end_date)), y=data_df['水揚量'], mode='lines+markers', name=f'{place}-{method}-{species}-漁獲量',
+                    line=dict(color='rgba(100,149,237,1.0)',
+                            width=2.0),
+                    marker=dict(color='rgba(100,149,237,0.9)',
+                            size=6)
+                            ))
+
+    # Plotly、漁獲量時系列グラフのレイアウトの指定
+    layout = go.Layout(xaxis=dict(title='日付', type='date', dtick='M6', tickformat='%Y-%m-%d'),
+                    yaxis=dict(title='漁獲量(kg)'),
+                    xaxis_rangeslider_visible=True,
+                    width=1000, height=750,
+                    clickmode='select+event',)
+                    # yaxis_rangeslider_visible=True)
+
+    fig = dict(data=traces, layout=layout)
+    st.plotly_chart(fig, use_container_width=True)
 
 
 
@@ -98,6 +124,7 @@ def main():
     with open(DATABASE_PATH+'group_dict.pkl', 'rb') as f: img_group_dict = pickle.load(f)
 
     np.set_printoptions(suppress=True) # 指数表記にしない
+    st.title('iSea: 海況と漁獲データの結びつけによる関連性の可視化')
     print('============== Initialized ==============')
 
     # print(methods_dict)
