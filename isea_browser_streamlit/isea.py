@@ -148,12 +148,13 @@ def main():
     with open(DATABASE_PATH+'group_dict.pkl', 'rb') as f: img_group_dict = pickle.load(f)
 
     # 文字列で表示するデータの開始と終了を定義 NOTE: 固定値になる気がするので大文字変数にした方がいいかも
-    start_date, end_date = '2012-01-01', '2018-12-31'
+    start_date_str, end_date_str = '2012-01-01', '2018-12-31'
     # 文字列をdatetime objectに変換
-    start_date, end_date = dt.strptime(start_date, '%Y-%m-%d'), dt.strptime(end_date, '%Y-%m-%d')
+    start_date, end_date = dt.strptime(start_date_str, '%Y-%m-%d'), dt.strptime(end_date_str, '%Y-%m-%d')
 
     np.set_printoptions(suppress=True) # 指数表記にしない
     st.title('iSea: 海況と漁獲データの結びつけによる関連性の可視化')
+    st.write(f'{start_date_str}~{end_date_str} までの期間のデータを対象とします')
     print('============== Initialized ==============')
 
 
@@ -174,17 +175,20 @@ def main():
     traces = [make_plotly_graph(_df) for _df in data_dfs if len(_df)!=0]
 
     # 漁獲量の最大値を取得する
-    max_catch = int(max([_df['水揚量'].max() for _df in data_dfs if len(_df)!=0]))
+    if len(data_dfs)==0:
+        max_catch = 1
+    else:
+        max_catch = int(max([_df['水揚量'].max() for _df in data_dfs if len(_df)!=0]))
 
     # 0~漁獲量の最大値までの間で、ポジネガを分ける閾値を決める
-    threshold = st.sidebar.slider('漁獲量の閾値設定',  min_value=0, max_value=max_catch, step=1, value=0)
+    # threshold = st.sidebar.slider('漁獲量の閾値設定',  min_value=0, max_value=max_catch, step=1, value=0) # スライドバーは、ユーザビリティにかけるのでなし
+    threshold = st.sidebar.number_input('閾値選択', min_value=0, max_value=max_catch, value=int(max_catch//2), step=10000)
     x_range = list(daterange(start_date, end_date))
-    
+
     traces.append(go.Scatter(x=x_range, y=[threshold]*len(x_range), name='閾値'))
     st.write(f'閾値: {threshold}')
 
-
-
+    n_samples = st.sidebar.number_input('サンプリング数', min_value=0, value=5, step=1)
 
     # NOTE: Plotlyのグラフ生成は出来るだけ後ろに回した方が嬉しそう
     # 漁獲量の時系列グラフをPlotlyで表示
