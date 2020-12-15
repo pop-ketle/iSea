@@ -206,6 +206,33 @@ def main():
         # st.plotly_chart(fig, use_container_width=True) # Trueだとカラム幅にサイズが自動調整されるんだけど、それだとちょっと小さい
 
 
+    # ポジティブデータとネガティブデータに分割
+    for df in data_dfs:
+        print(df)
+
+        # 漁に行かなかったデータ以外を持ってくる(つまり、漁に行かなかったデータを削除する)
+        droped_df = df[df['水揚量']!=-1]
+
+        # 水揚量でソートして、ポジティブネガティブに2分割する
+        sorted_droped_df = droped_df.sort_values('水揚量')
+        positive_df, negative_df = sorted_droped_df[len(sorted_droped_df)//2:], sorted_droped_df[:len(sorted_droped_df)//2]
+
+        # 日付でソートして、n_samples分区切って、区切った点をサンプリングしてくる
+        positive_df = positive_df.sort_values('日付').reset_index()
+        negative_df = negative_df.sort_values('日付').reset_index()
+
+        # サンプリングするデータのインデックス
+        p_sampling_idx = [(len(positive_df)//n_samples) * i for i in range(n_samples)]
+        n_sampling_idx = [(len(negative_df)//n_samples) * i for i in range(n_samples)]
+
+        # サンプリングされてきたデータ
+        p_sampling_df = positive_df.iloc[p_sampling_idx]
+        n_sampling_df = negative_df.iloc[n_sampling_idx]
+
+        print(p_sampling_df)
+        print(n_sampling_df)
+
+
 
 if __name__ == "__main__":
     main()
