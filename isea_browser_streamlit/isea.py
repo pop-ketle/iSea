@@ -12,18 +12,6 @@ from datetime import timedelta
 import plotly.graph_objs as go
 
 
-def nibutan(df, target_col, threshold):
-    '''dfのtarget_colの列をthresholdで分割する(dfはソートしてから渡して)
-    '''
-    lo, hi = 0, len(df)
-    while lo<hi:
-        mid = (lo+hi) // 2
-        if df.iloc[mid][target_col]<threshold:
-            lo = mid+1
-        else:
-            hi = mid
-    return lo
-
 def daterange(_start, _end):
     for n in range((_end - _start).days+1):
         yield _start + timedelta(n)
@@ -142,19 +130,15 @@ def make_plotly_graph(df):
         marker=dict(size=6),
     )
 
-# @st.cache  # 👈 Added this
-# def expensive_computation(a, b):
-#     time.sleep(2)  # This makes the function take 2s to run
-#     return a * b
-
 @st.cache # threshold変わらず、サンプリング数が変わることがあると思うのでキャッシュ化に意味がありそうなので採用！
 def divide_pn_df(df, target_col, threshold):
-    '''dfのtarget_colの列をthresholdでポジティブ・ネガティブに分割して返す
+    '''pd.cutでthresholdを境にpositive, negativeを分割して返す
     '''
-    sorted_droped_df = df.sort_values(target_col)
-    idx = nibutan(sorted_droped_df, target_col, threshold)
-    positive_df, negative_df = sorted_droped_df[idx:], sorted_droped_df[:idx]
+    df['positive_negative'] = pd.cut(df['水揚量'], bins=[-1, threshold, df['水揚量'].max()], labels=['negative','positive'])
+    positive_df = df[df['positive_negative']=='positive']
+    negative_df = df[df['positive_negative']=='negative']
     return positive_df, negative_df
+
 
 
 def main():
@@ -221,7 +205,7 @@ def main():
         # 漁に行かなかったデータ以外を持ってくる(つまり、漁に行かなかったデータを削除する)
         droped_df = df[df['水揚量']!=-1]
 
-        # 水揚量でソートして、ポジティブネガティブに2分割する
+        # 水揚量で閾値を境に、ポジティブネガティブに2分割する
         positive_df, negative_df = divide_pn_df(droped_df, '水揚量', threshold)
 
         # # 日付でソートして、n_samples分区切って、区切った点をサンプリングしてくる
