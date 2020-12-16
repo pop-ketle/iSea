@@ -1,3 +1,4 @@
+import time
 import pickle
 import sqlite3
 import itertools
@@ -10,6 +11,18 @@ from datetime import timedelta
 
 import plotly.graph_objs as go
 
+
+def nibutan(df, target_col, threshold):
+    '''dfのtarget_colの列をthresholdで分割する(dfはソートしてから渡して)
+    '''
+    lo, hi = 0, len(df)
+    while lo<hi:
+        mid = (lo+hi) // 2
+        if df.iloc[mid][target_col]<threshold:
+            lo = mid+1
+        else:
+            hi = mid
+    return lo
 
 def daterange(_start, _end):
     for n in range((_end - _start).days+1):
@@ -129,8 +142,19 @@ def make_plotly_graph(df):
         marker=dict(size=6),
     )
 
+# @st.cache  # 👈 Added this
+# def expensive_computation(a, b):
+#     time.sleep(2)  # This makes the function take 2s to run
+#     return a * b
 
-
+@st.cache # threshold変わらず、サンプリング数が変わることがあると思うのでキャッシュ化に意味がありそうなので採用！
+def divide_pn_df(df, target_col, threshold):
+    '''dfのtarget_colの列をthresholdでポジティブ・ネガティブに分割して返す
+    '''
+    sorted_droped_df = df.sort_values(target_col)
+    idx = nibutan(sorted_droped_df, target_col, threshold)
+    positive_df, negative_df = sorted_droped_df[idx:], sorted_droped_df[:idx]
+    return positive_df, negative_df
 
 
 def main():
@@ -190,6 +214,40 @@ def main():
 
     n_samples = st.sidebar.number_input('サンプリング数', min_value=0, value=5, step=1)
 
+    # ポジティブデータとネガティブデータに分割
+    for df in data_dfs:
+        print(df)
+
+        # 漁に行かなかったデータ以外を持ってくる(つまり、漁に行かなかったデータを削除する)
+        droped_df = df[df['水揚量']!=-1]
+
+        # 水揚量でソートして、ポジティブネガティブに2分割する
+        positive_df, negative_df = divide_pn_df(droped_df, '水揚量', threshold)
+
+        # # 日付でソートして、n_samples分区切って、区切った点をサンプリングしてくる
+        # positive_df = positive_df.sort_values('日付').reset_index()
+        # negative_df = negative_df.sort_values('日付').reset_index()
+
+        # # サンプリングするデータのインデックス
+        # p_sampling_idx = [(len(positive_df)//n_samples) * i for i in range(n_samples)]
+        # n_sampling_idx = [(len(negative_df)//n_samples) * i for i in range(n_samples)]
+
+        # # サンプリングされてきたデータ
+        # p_sampling_df = positive_df.iloc[p_sampling_idx]
+        # n_sampling_df = negative_df.iloc[n_sampling_idx]
+
+
+        # print(p_sampling_df)
+        # print('')
+        # print(threshold)
+        # print('')
+        # print(n_sampling_df)
+
+        # traces.append(go.Scatter(x=p_sampling_df['日付'], y=p_sampling_df['水揚量'], mode='markers', name='ポジティブデータサンプル', marker_color='rgba(255,0,0,.8)', marker_size=15))
+
+
+    ##########################
+
     # NOTE: Plotlyのグラフ生成は出来るだけ後ろに回した方が嬉しそう
     # 漁獲量の時系列グラフをPlotlyで表示
     if len(traces)!=0:
@@ -206,31 +264,6 @@ def main():
         # st.plotly_chart(fig, use_container_width=True) # Trueだとカラム幅にサイズが自動調整されるんだけど、それだとちょっと小さい
 
 
-    # ポジティブデータとネガティブデータに分割
-    for df in data_dfs:
-        print(df)
-
-        # 漁に行かなかったデータ以外を持ってくる(つまり、漁に行かなかったデータを削除する)
-        droped_df = df[df['水揚量']!=-1]
-
-        # 水揚量でソートして、ポジティブネガティブに2分割する
-        sorted_droped_df = droped_df.sort_values('水揚量')
-        positive_df, negative_df = sorted_droped_df[len(sorted_droped_df)//2:], sorted_droped_df[:len(sorted_droped_df)//2]
-
-        # 日付でソートして、n_samples分区切って、区切った点をサンプリングしてくる
-        positive_df = positive_df.sort_values('日付').reset_index()
-        negative_df = negative_df.sort_values('日付').reset_index()
-
-        # サンプリングするデータのインデックス
-        p_sampling_idx = [(len(positive_df)//n_samples) * i for i in range(n_samples)]
-        n_sampling_idx = [(len(negative_df)//n_samples) * i for i in range(n_samples)]
-
-        # サンプリングされてきたデータ
-        p_sampling_df = positive_df.iloc[p_sampling_idx]
-        n_sampling_df = negative_df.iloc[n_sampling_idx]
-
-        print(p_sampling_df)
-        print(n_sampling_df)
 
 
 
