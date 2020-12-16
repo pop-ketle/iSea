@@ -1,3 +1,4 @@
+import os
 import time
 import pickle
 import sqlite3
@@ -5,7 +6,9 @@ import itertools
 import numpy as np
 import pandas as pd
 import configparser
+from PIL import Image
 import streamlit as st
+import streamlit.components.v1 as components
 from datetime import datetime as dt
 from datetime import timedelta
 
@@ -147,6 +150,26 @@ def sampling_data(df, n_samples):
     # サンプリングされてきたデータ
     return df.iloc[sampling_idx]
 
+# @st.cache
+def get_img_list(dates, database_path):
+    '''日付のpd.Series(dates)を受け取り、それと対応するbaseエンコードされた画像を値、日付をキーとするdictを返す
+    '''
+    def get_img_from_db(date, database_path):
+        '''日付を与えると対応するbaseエンコードされた画像がdbから引っ張られてくる
+        '''
+        con = sqlite3.connect(database_path+'encoded_img.db')
+        c   = con.cursor()
+        c.execute(f'SELECT encoded_img from encoded_imgs WHERE date=="{date}"')
+        img_b64data = [list(s)[0] for s in c]
+        # 画像のデータがなかったときは何もしない
+        if len(img_b64data)!=0:
+            con.close()
+            return img_b64data[0]
+
+    b64_img_dict = {date: get_img_from_db(date, database_path) for date in set(dates.astype(str).values)}
+    return b64_img_dict
+
+
 
 def main():
     # configparserの宣言とiniファイルの読み込み
@@ -200,15 +223,15 @@ def main():
     threshold = st.sidebar.number_input('閾値選択', min_value=0, max_value=max_catch, value=int(max_catch//2), step=10000)
     x_range = list(daterange(start_date, end_date))
 
-    traces.append(go.Scatter(x=x_range, y=[threshold]*len(x_range), name='閾値', marker_color='rgba(124,117,117,1.0)'))
+    traces.append(go.Scatter(x=x_range, y=[threshold]*len(x_range), name='閾値', marker_color='rgba(0,255,0,1.0)'))
     st.write(f'閾値: {threshold}')
 
     n_samples = st.sidebar.number_input('サンプリング数', min_value=1, value=5, step=1)
 
-    # ポジティブデータとネガティブデータに分割
+    # 漁獲量時系列グラフ表示部
+    # ポジティブデータとネガティブデータに分割して、サンプリングしたデータをPlotlyにプロット
     for df in data_dfs:
         if len(df)==0: continue # 念の為
-        print(df)
 
         # 漁に行かなかったデータ以外を持ってくる(つまり、漁に行かなかったデータを除外する)
         droped_df = df[df['水揚量']!=-1]
@@ -225,10 +248,6 @@ def main():
         traces.append(go.Scatter(x=p_sampling_df['日付'], y=p_sampling_df['水揚量'], mode='markers', name=f'{_place}-{_method}-{_species}-ポジティブ', marker_color='rgba(255,0,0,.8)', marker_size=15))
         traces.append(go.Scatter(x=n_sampling_df['日付'], y=n_sampling_df['水揚量'], mode='markers', name=f'{_place}-{_method}-{_species}-ネガティブ', marker_color='rgba(0,0,255,.8)', marker_size=15))
 
-
-
-    ##########################
-
     # NOTE: Plotlyのグラフ生成は出来るだけ後ろに回した方が嬉しそう
     # 漁獲量の時系列グラフをPlotlyで表示
     if len(traces)!=0:
@@ -242,6 +261,68 @@ def main():
         fig = dict(data=traces, layout=layout)
         st.plotly_chart(fig)
         # st.plotly_chart(fig, use_container_width=True) # Trueだとカラム幅にサイズが自動調整されるんだけど、それだとちょっと小さい
+
+    # ---
+    st.markdown('---')
+
+    # 画像表示部
+    # ポジティブデータとネガティブデータに分割して、サンプリングした画像データを表示
+    for df in data_dfs:
+        if len(df)==0: continue # 念の為
+
+        # 漁に行かなかったデータ以外を持ってくる(つまり、漁に行かなかったデータを除外する)
+        droped_df = df[df['水揚量']!=-1]
+
+        # 水揚量で閾値を境に、ポジティブネガティブに2分割する
+        positive_df, negative_df = divide_pn_df(droped_df, '水揚量', threshold)
+
+        # 日付でソートして、n_samples分区切って、区切った点をサンプリングしてくる
+        p_sampling_df = sampling_data(positive_df, n_samples)
+        n_sampling_df = sampling_data(negative_df, n_samples)
+        
+        st.write(f'{df["場所"][0]} {df["漁業種類"][0]} {df["魚種"][0]} ポジティブデータ')
+        st.markdown('---')
+
+        print(p_sampling_df)
+        print(p_sampling_df['日付'])
+
+        # サンプリングされた画像のbaseエンコードされたデータのリストを取得
+        b64_img_dict = get_img_list(p_sampling_df['日付'], DATABASE_PATH)
+
+        print(len(b64_img_dict))
+        print(b64_img_dict.keys())
+        # html_text = '<table border="1">'
+        html_text = f"""
+            <table border="1">
+            <thead>
+            <tr valign="top">
+                <th colspan={len(b64_img_dict)*2}>ポジティブデータサンプル</th>
+            </tr>
+            </thead>
+        """
+        html_text += '<tbody> <form action="/img_details" method="POST" enctype="multipart/form-data" target="_blank" name="select_image">'
+        for i, (k, v) in enumerate(b64_img_dict.items()):
+            # 日付と画像の紐づいたボタンを作るhtmlコードを書く
+            if i!=0 and i%5==0:
+                html_text +='<tr>'
+            html_text += '<td>'
+            html_text += f'<input type="hidden" name="date" value="{k}">'
+            html_text += f'<input type="image" alt="not found image of {k}" src="{v}" width="110" height="150" style="margin-top: 10px; vertical-align: bottom;">'
+            html_text += '</td>'
+
+            html_text += f"""
+                <td>
+                日付: <br>{k}<br>
+                漁獲量:<br>{p_sampling_df[p_sampling_df['日付']==k]['水揚量'].values[0]}(kg)<br>
+                </td>
+            """
+
+            if i!=4 and i%5==4:
+                html_text +='</tr>'
+        html_text += '</form></tbody></table>'
+        components.html(html_text, width=1200, height=250*(len(b64_img_dict)//5), scrolling=True)
+
+        # print(html_text)
 
 
 
