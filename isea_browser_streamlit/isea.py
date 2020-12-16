@@ -139,6 +139,13 @@ def divide_pn_df(df, target_col, threshold):
     negative_df = df[df['positive_negative']=='negative']
     return positive_df, negative_df
 
+@st.cache # サンプリング数が変わらず、他条件が変わることがあると思うのでキャッシュ化 NOTE: あんまりキャッシュ化の効果ないかも
+def sampling_data(df, n_samples):
+    df = df.sort_values('日付', ascending=False).reset_index() # 新しいデータから順にサンプリングしてきたいので降順にする
+    # サンプリングするデータのインデックス
+    sampling_idx = [(len(df)//n_samples) * i for i in range(n_samples)]
+    # サンプリングされてきたデータ
+    return df.iloc[sampling_idx]
 
 
 def main():
@@ -179,7 +186,7 @@ def main():
     for p, m, s in comb: # 場所、漁法、魚種
         data_dfs.append(make_data_df(p, m, s, start_date, end_date, DB_PATH))
 
-    # これにグラフのデータが詰まってる
+    # tracesにグラフのデータを詰めていく
     traces = [make_plotly_graph(_df) for _df in data_dfs if len(_df)!=0]
 
     # 漁獲量の最大値を取得する
@@ -193,41 +200,31 @@ def main():
     threshold = st.sidebar.number_input('閾値選択', min_value=0, max_value=max_catch, value=int(max_catch//2), step=10000)
     x_range = list(daterange(start_date, end_date))
 
-    traces.append(go.Scatter(x=x_range, y=[threshold]*len(x_range), name='閾値'))
+    traces.append(go.Scatter(x=x_range, y=[threshold]*len(x_range), name='閾値', marker_color='rgba(124,117,117,1.0)'))
     st.write(f'閾値: {threshold}')
 
-    n_samples = st.sidebar.number_input('サンプリング数', min_value=0, value=5, step=1)
+    n_samples = st.sidebar.number_input('サンプリング数', min_value=1, value=5, step=1)
 
     # ポジティブデータとネガティブデータに分割
     for df in data_dfs:
+        if len(df)==0: continue # 念の為
         print(df)
 
-        # 漁に行かなかったデータ以外を持ってくる(つまり、漁に行かなかったデータを削除する)
+        # 漁に行かなかったデータ以外を持ってくる(つまり、漁に行かなかったデータを除外する)
         droped_df = df[df['水揚量']!=-1]
 
         # 水揚量で閾値を境に、ポジティブネガティブに2分割する
         positive_df, negative_df = divide_pn_df(droped_df, '水揚量', threshold)
 
-        # # 日付でソートして、n_samples分区切って、区切った点をサンプリングしてくる
-        # positive_df = positive_df.sort_values('日付').reset_index()
-        # negative_df = negative_df.sort_values('日付').reset_index()
+        # 日付でソートして、n_samples分区切って、区切った点をサンプリングしてくる
+        p_sampling_df = sampling_data(positive_df, n_samples)
+        n_sampling_df = sampling_data(negative_df, n_samples)
+        
+        # サンプリングしたデータをPlotlyの時系列グラフにプロット
+        _place, _method, _species = p_sampling_df['場所'].values[0], p_sampling_df['漁業種類'].values[0], p_sampling_df['魚種'].values[0]
+        traces.append(go.Scatter(x=p_sampling_df['日付'], y=p_sampling_df['水揚量'], mode='markers', name=f'{_place}-{_method}-{_species}-ポジティブ', marker_color='rgba(255,0,0,.8)', marker_size=15))
+        traces.append(go.Scatter(x=n_sampling_df['日付'], y=n_sampling_df['水揚量'], mode='markers', name=f'{_place}-{_method}-{_species}-ネガティブ', marker_color='rgba(0,0,255,.8)', marker_size=15))
 
-        # # サンプリングするデータのインデックス
-        # p_sampling_idx = [(len(positive_df)//n_samples) * i for i in range(n_samples)]
-        # n_sampling_idx = [(len(negative_df)//n_samples) * i for i in range(n_samples)]
-
-        # # サンプリングされてきたデータ
-        # p_sampling_df = positive_df.iloc[p_sampling_idx]
-        # n_sampling_df = negative_df.iloc[n_sampling_idx]
-
-
-        # print(p_sampling_df)
-        # print('')
-        # print(threshold)
-        # print('')
-        # print(n_sampling_df)
-
-        # traces.append(go.Scatter(x=p_sampling_df['日付'], y=p_sampling_df['水揚量'], mode='markers', name='ポジティブデータサンプル', marker_color='rgba(255,0,0,.8)', marker_size=15))
 
 
     ##########################
@@ -241,7 +238,6 @@ def main():
                         xaxis_rangeslider_visible=True,
                         width=900, height=750,
                         clickmode='select+event',)
-                        # yaxis_rangeslider_visible=True)
 
         fig = dict(data=traces, layout=layout)
         st.plotly_chart(fig)
