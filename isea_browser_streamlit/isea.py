@@ -1,4 +1,5 @@
 import os
+import math
 import time
 import pickle
 import sqlite3
@@ -146,7 +147,7 @@ def divide_pn_df(df, target_col, threshold):
 def sampling_data(df, n_samples):
     df = df.sort_values('日付', ascending=False).reset_index() # 新しいデータから順にサンプリングしてきたいので降順にする
     # サンプリングするデータのインデックス
-    sampling_idx = [(len(df)//n_samples) * i for i in range(n_samples)]
+    sampling_idx = sorted(list(set([(len(df)//n_samples) * i for i in range(n_samples)])))
     # サンプリングされてきたデータ
     return df.iloc[sampling_idx]
 
@@ -169,6 +170,44 @@ def get_img_list(dates, database_path):
     b64_img_dict = {date: get_img_from_db(date, database_path) for date in set(dates.astype(str).values)}
     return b64_img_dict
 
+def render_sampling_img(img_dict, df, title, n_col):
+    '''baseエンコードされた画像を値、日付をキーとするdictを受け取って画像をテーブルで表示するhtml stringを書いてレンダリングする
+    Args:
+        img_dict(dict): baseエンコードされた画像を値、日付をキーとするdict
+        df(pd.DataFrame): 表示したいデータのpd.DataFrame
+        title(str): 表示するテーブルのタイトル
+        n_col(int): 表示するテーブルのカラム数(ここで改行する)
+    '''
+    html_text = f"""
+        <table border="1">
+        <thead>
+        <tr valign="top">
+            <th colspan={len(img_dict)*2}>{title}</th>
+        </tr>
+        </thead>
+    """
+    html_text += '<tbody> <form action="/img_details" method="POST" enctype="multipart/form-data" target="_blank" name="select_image">'
+    for i, (k, v) in enumerate(img_dict.items()):
+        print(k, i)
+        # 日付と画像の紐づいたボタンを作るhtml stringを書く
+        if i!=0 and i%n_col==0: # テーブルを改行する
+            html_text += '<tr>'
+        html_text += '<td>'
+        html_text += f'<input type="hidden" name="date" value="{k}">'
+        html_text += f'<input type="image" alt="not found image of {k}" src="{v}" width="110" height="150" style="margin-top: 10px; vertical-align: bottom;">'
+        html_text += '</td>'
+
+        html_text += f"""
+            <td>
+            日付: <br>{k}<br>
+            漁獲量:<br>{df[df['日付']==k]['水揚量'].values[0]}(kg)<br>
+            </td>
+        """
+
+        if i!=(n_col-1) and i%n_col==(n_col-1):
+            html_text +='</tr>'
+    html_text += '</form></tbody></table>'
+    components.html(html_text, width=1200, height=230*math.ceil(len(img_dict)/n_col), scrolling=True)
 
 
 def main():
@@ -280,49 +319,24 @@ def main():
         p_sampling_df = sampling_data(positive_df, n_samples)
         n_sampling_df = sampling_data(negative_df, n_samples)
         
-        st.write(f'{df["場所"][0]} {df["漁業種類"][0]} {df["魚種"][0]} ポジティブデータ')
-        st.markdown('---')
+        # print(p_sampling_df)
+        # print(p_sampling_df['日付'])
 
-        print(p_sampling_df)
-        print(p_sampling_df['日付'])
+        for i, sampling_df in enumerate([p_sampling_df, n_sampling_df]):
+            if i==0: # ポジティブデータなら
+                title = f'{df["場所"][0]} {df["漁業種類"][0]} {df["魚種"][0]} ポジティブデータ'
+            else:
+                title = f'{df["場所"][0]} {df["漁業種類"][0]} {df["魚種"][0]} ネガティブデータ'
 
-        # サンプリングされた画像のbaseエンコードされたデータのリストを取得
-        b64_img_dict = get_img_list(p_sampling_df['日付'], DATABASE_PATH)
+            st.markdown('---')
+            st.write(title)
 
-        print(len(b64_img_dict))
-        print(b64_img_dict.keys())
-        # html_text = '<table border="1">'
-        html_text = f"""
-            <table border="1">
-            <thead>
-            <tr valign="top">
-                <th colspan={len(b64_img_dict)*2}>ポジティブデータサンプル</th>
-            </tr>
-            </thead>
-        """
-        html_text += '<tbody> <form action="/img_details" method="POST" enctype="multipart/form-data" target="_blank" name="select_image">'
-        for i, (k, v) in enumerate(b64_img_dict.items()):
-            # 日付と画像の紐づいたボタンを作るhtmlコードを書く
-            if i!=0 and i%5==0:
-                html_text +='<tr>'
-            html_text += '<td>'
-            html_text += f'<input type="hidden" name="date" value="{k}">'
-            html_text += f'<input type="image" alt="not found image of {k}" src="{v}" width="110" height="150" style="margin-top: 10px; vertical-align: bottom;">'
-            html_text += '</td>'
+            # サンプリングされた画像のbaseエンコードされた画像を値、日付をキーとするdictを取得
+            b64_img_dict = get_img_list(sampling_df['日付'], DATABASE_PATH)
 
-            html_text += f"""
-                <td>
-                日付: <br>{k}<br>
-                漁獲量:<br>{p_sampling_df[p_sampling_df['日付']==k]['水揚量'].values[0]}(kg)<br>
-                </td>
-            """
+            # baseエンコードされた画像を値、日付をキーとするdictから情報を受け取ってhtml stringを作成してレンダリングする
+            render_sampling_img(b64_img_dict, sampling_df, title, 5)
 
-            if i!=4 and i%5==4:
-                html_text +='</tr>'
-        html_text += '</form></tbody></table>'
-        components.html(html_text, width=1200, height=250*(len(b64_img_dict)//5), scrolling=True)
-
-        # print(html_text)
 
 
 
