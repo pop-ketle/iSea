@@ -1,6 +1,6 @@
 import os
 import math
-import time
+import pytz
 import pickle
 import sqlite3
 import itertools
@@ -12,6 +12,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 from datetime import datetime as dt
 from datetime import timedelta
+from datetime import time
 
 import plotly.graph_objs as go
 
@@ -63,13 +64,13 @@ def select_place_method_species(methods_dict, species_dict):
 
     return selected_places, selected_methods, selected_species
 
-def make_data_df(place, method, species, start_date, end_date, db_path):
-    '''place, method, species, start_date, end_dateに対応するデータをpd.DataFrameの形式で返す
+def make_data_df(place, method, species, min_date, max_date, db_path):
+    '''place, method, species, min_date, max_dateに対応するデータをpd.DataFrameの形式で返す
     Args:
         place(str): 選択された湾名
         method(str): 選択された漁業手法
         species(str): 選択された魚種
-        start_date(datetime object): 持ってくるデータの期間の開始日
+        min_date(datetime object): 持ってくるデータの期間の開始日
         end_data(datetime object): 持ってくるデータの期間の最終日
         db_path(str): 漁獲データのデータが置いてあるdbへのパス
     Returns:
@@ -85,7 +86,7 @@ def make_data_df(place, method, species, start_date, end_date, db_path):
         WHERE 場所=='{place}'
             and 漁業種類=='{method}'
             and 魚種=='{species}'
-            and 日付 BETWEEN '{start_date}' AND '{end_date}'
+            and 日付 BETWEEN '{min_date}' AND '{max_date}'
         ORDER BY 日付
     '''
     c.execute(sql)
@@ -96,13 +97,13 @@ def make_data_df(place, method, species, start_date, end_date, db_path):
     data_df['日付'] = data_df['日付'].astype('datetime64[ns]')
 
     # データベースに無い日付を補完するためのpd.DataFrameを作成して補完
-    _df = pd.DataFrame(pd.date_range(start_date, end_date, freq='D'), columns=['日付'])
+    _df = pd.DataFrame(pd.date_range(min_date, max_date, freq='D'), columns=['日付'])
     data_df = pd.merge(_df, data_df, how='outer', on='日付')
     data_df['場所'].fillna(place, inplace=True)
     data_df['漁業種類'].fillna(method, inplace=True)
     data_df['魚種'].fillna(species, inplace=True)
 
-    # 水揚量が全部欠損値、つまり寮に行ったデータがなかった時
+    # 水揚量が全部欠損値、つまり漁に行ったデータがなかった時
     if data_df['水揚量'].isnull().sum()==len(data_df):
         return pd.DataFrame()
     else:
@@ -120,12 +121,12 @@ def make_data_df(place, method, species, start_date, end_date, db_path):
 def make_plotly_graph(df):
     '''pd.DataFrameから時系列の漁獲量折れ線グラフを生成
     '''
-    start_date, end_date = df['日付'].min(), df['日付'].max()
+    min_date, max_date = df['日付'].min(), df['日付'].max()
     place, method, species = df['場所'][0], df['漁業種類'][0], df['魚種'][0]
 
     # 漁獲量の折れ線グラフ
     return go.Scatter(
-        x=list(daterange(start_date, end_date)),
+        x=list(daterange(min_date, max_date)),
         y=df['水揚量'],
         mode='lines+markers',
         name=f'{place}-{method}-{species}',
@@ -186,7 +187,7 @@ def render_sampling_img(img_dict, df, title, n_col):
         </tr>
         </thead>
     """
-    html_text += '<tbody> <form action="/img_details" method="POST" enctype="multipart/form-data" target="_blank" name="select_image">'
+    html_text += '<tbody> <form action="/" method="POST" enctype="multipart/form-data" target="_blank" name="select_image">'
     for i, (k, v) in enumerate(img_dict.items()):
         print(k, i)
         # 日付と画像の紐づいたボタンを作るhtml stringを書く
@@ -207,7 +208,7 @@ def render_sampling_img(img_dict, df, title, n_col):
         if i!=(n_col-1) and i%n_col==(n_col-1):
             html_text +='</tr>'
     html_text += '</form></tbody></table>'
-    components.html(html_text, width=1200, height=230*math.ceil(len(img_dict)/n_col), scrolling=True)
+    components.html(html_text, width=1200, height=210*math.ceil(len(img_dict)/n_col), scrolling=True)
 
 
 def main():
@@ -225,15 +226,27 @@ def main():
     with open(DATABASE_PATH+'group_dict.pkl', 'rb') as f: img_group_dict = pickle.load(f)
 
     # 文字列で表示するデータの開始と終了を定義 NOTE: 固定値になる気がするので大文字変数にした方がいいかも
-    start_date_str, end_date_str = '2012-01-01', '2018-12-31'
+    min_date_str, max_date_str = '2012-01-01', '2018-12-31'
     # 文字列をdatetime objectに変換
-    start_date, end_date = dt.strptime(start_date_str, '%Y-%m-%d'), dt.strptime(end_date_str, '%Y-%m-%d')
+    min_date, max_date = dt.strptime(min_date_str, '%Y-%m-%d'), dt.strptime(max_date_str, '%Y-%m-%d')
+
+    # NOTE: 日付選択できるようにしようとしたら意外と沼ったので後回し
+    # print(min_date, max_date, type(min_date), type(max_date))
+    # selected_date = st.sidebar.date_input(
+    #     "表示したい期間を入力してください",
+    #     [min_date, max_date],
+    #     min_value=min_date,
+    #     max_value=max_date
+    # )
+    # min_date, max_date = selected_date[0], selected_date[1]
+    # # min_data = dt.combine(min_date, time())
+    # # min_date = pytz.timezone('Asia/Tokyo').localize(dt_native)
+    # print(min_date, max_date, type(min_date), type(max_date))
 
     np.set_printoptions(suppress=True) # 指数表記にしない
     st.title('iSea: 海況と漁獲データの結びつけによる関連性の可視化')
-    st.write(f'{start_date_str}~{end_date_str} までの期間のデータを対象とします')
+    st.write(f'{min_date_str}~{max_date_str} までの期間のデータを対象とします')
     print('============== Initialized ==============')
-
 
     # サイドバーで漁港、漁業手法、魚種を選択(複数選択可)
     place, method, species = select_place_method_species(methods_dict, species_dict)
@@ -246,7 +259,7 @@ def main():
     # 選択した複数条件の全ての組み合わせに対応するpd.DataFrameのリストを得る NOTE: 内包表記で書いた方が早いんだろうけど、長くなってみにくそう
     data_dfs = []
     for p, m, s in comb: # 場所、漁法、魚種
-        data_dfs.append(make_data_df(p, m, s, start_date, end_date, DB_PATH))
+        data_dfs.append(make_data_df(p, m, s, min_date, max_date, DB_PATH))
 
     # tracesにグラフのデータを詰めていく
     traces = [make_plotly_graph(_df) for _df in data_dfs if len(_df)!=0]
@@ -255,12 +268,16 @@ def main():
     if len(data_dfs)==0:
         max_catch = 1
     else:
-        max_catch = int(max([_df['水揚量'].max() for _df in data_dfs if len(_df)!=0]))
+        tmp = [_df['水揚量'].max() for _df in data_dfs if len(_df)!=0]
+        if len(tmp)==0: # 全部空のpd.DataFrameだったとき 0
+            max_catch = 0
+        else:
+            max_catch = int(min(tmp)) # 各DFの中でも最小値を決めることで、ビニングするときにthresholdが最大値を超えないことを期待する
 
     # 0~漁獲量の最大値までの間で、ポジネガを分ける閾値を決める
     # threshold = st.sidebar.slider('漁獲量の閾値設定',  min_value=0, max_value=max_catch, step=1, value=0) # スライドバーは、ユーザビリティにかけるのでなし
     threshold = st.sidebar.number_input('閾値選択', min_value=0, max_value=max_catch, value=int(max_catch//2), step=10000)
-    x_range = list(daterange(start_date, end_date))
+    x_range = list(daterange(min_date, max_date))
 
     traces.append(go.Scatter(x=x_range, y=[threshold]*len(x_range), name='閾値', marker_color='rgba(0,255,0,1.0)'))
     st.write(f'閾値: {threshold}')
@@ -319,9 +336,7 @@ def main():
         p_sampling_df = sampling_data(positive_df, n_samples)
         n_sampling_df = sampling_data(negative_df, n_samples)
         
-        # print(p_sampling_df)
-        # print(p_sampling_df['日付'])
-
+        # サンプリングされてきた画像表示部分
         for i, sampling_df in enumerate([p_sampling_df, n_sampling_df]):
             if i==0: # ポジティブデータなら
                 title = f'{df["場所"][0]} {df["漁業種類"][0]} {df["魚種"][0]} ポジティブデータ'
@@ -338,7 +353,23 @@ def main():
             render_sampling_img(b64_img_dict, sampling_df, title, 5)
 
 
+    # col1, col2, col3 = st.beta_columns(3)
 
+    # with col1:
+    #     st.header("A cat")
+    #     st.image("https://static.streamlit.io/examples/cat.jpg", use_column_width=True)
+
+    # with col2:
+    #     st.header("A dog")
+    #     st.image("https://static.streamlit.io/examples/dog.jpg", use_column_width=True)
+
+    # with col3:
+    #     st.header("An owl")
+    #     st.image("https://static.streamlit.io/examples/owl.jpg", use_column_width=True)
+    #     if st.button('Say hello'):
+    #         st.write('Why hello there')
+    #     else:
+    #         st.write('gg')
 
 
 
