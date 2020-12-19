@@ -404,10 +404,16 @@ def main():
                     html_text = f'<img src="{v}" width="110" height="150"/>'
                     components.html(html_text, width=120, height=170)
 
-                    st.write(f'日付: {k}')
-                    st.write(f'漁獲量: {int(sampling_df[sampling_df["日付"]==k]["水揚量"].values[0])}(kg)')
+                    # st.write(f'日付: {k}')
+                    # st.write(f'漁獲量: {int(sampling_df[sampling_df["日付"]==k]["水揚量"].values[0])}(kg)')
 
-                    if st.button(f'{title}{j}'):
+                    button_text = f'''
+                        日付: {k} \n
+                        漁獲量: {int(sampling_df[sampling_df["日付"]==k]["水揚量"].values[0])}(kg)
+                    '''
+                    st.write(button_text)
+
+                    if st.button(f'選択: {j}', key=f'{title}{j}'):
                         selected_date = k
 
                 col_no+=1
