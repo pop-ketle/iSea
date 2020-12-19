@@ -139,10 +139,14 @@ def make_plotly_graph(df):
 def divide_pn_df(df, target_col, threshold):
     '''pd.cutでthresholdを境にpositive, negativeを分割して返す
     '''
-    df['positive_negative'] = pd.cut(df['水揚量'], bins=[-1, threshold, df['水揚量'].max()], labels=['negative','positive'])
-    positive_df = df[df['positive_negative']=='positive']
-    negative_df = df[df['positive_negative']=='negative']
-    return positive_df, negative_df
+    if df['水揚量'].max()<threshold: # dfの最大値が閾値以下の時はpositiveに空pd.DataFrameを返して、negativeにdfを返す
+        df['positive_negative'] = 'negative'
+        return pd.DataFrame(), df
+    else:
+        df['positive_negative'] = pd.cut(df['水揚量'], bins=[-1, threshold, df['水揚量'].max()], labels=['negative','positive'])
+        positive_df = df[df['positive_negative']=='positive']
+        negative_df = df[df['positive_negative']=='negative']
+        return positive_df, negative_df
 
 @st.cache # サンプリング数が変わらず、他条件が変わることがあると思うのでキャッシュ化 NOTE: あんまりキャッシュ化の効果ないかも
 def sampling_data(df, n_samples):
@@ -153,7 +157,7 @@ def sampling_data(df, n_samples):
     return df.iloc[sampling_idx]
 
 # @st.cache
-def get_img_list(dates, database_path):
+def get_img_dict(dates, database_path):
     '''日付のpd.Series(dates)を受け取り、それと対応するbaseエンコードされた画像を値、日付をキーとするdictを返す
     '''
     def get_img_from_db(date, database_path):
@@ -208,7 +212,7 @@ def render_sampling_img(img_dict, df, title, n_col):
         if i!=(n_col-1) and i%n_col==(n_col-1):
             html_text +='</tr>'
     html_text += '</form></tbody></table>'
-    components.html(html_text, width=1200, height=210*math.ceil(len(img_dict)/n_col), scrolling=True)
+    components.html(html_text, width=1200, height=220*math.ceil(len(img_dict)/n_col), scrolling=True)
 
 
 def main():
@@ -244,8 +248,10 @@ def main():
     # print(min_date, max_date, type(min_date), type(max_date))
 
     np.set_printoptions(suppress=True) # 指数表記にしない
+    st.set_page_config(page_title='iSea: 海況と漁獲データの結びつけによる関連性の可視化', page_icon=None, layout='wide', initial_sidebar_state='auto')
     st.title('iSea: 海況と漁獲データの結びつけによる関連性の可視化')
     st.write(f'{min_date_str}~{max_date_str} までの期間のデータを対象とします')
+
     print('============== Initialized ==============')
 
     # サイドバーで漁港、漁業手法、魚種を選択(複数選択可)
@@ -347,29 +353,192 @@ def main():
             st.write(title)
 
             # サンプリングされた画像のbaseエンコードされた画像を値、日付をキーとするdictを取得
-            b64_img_dict = get_img_list(sampling_df['日付'], DATABASE_PATH)
+            b64_img_dict = get_img_dict(sampling_df['日付'], DATABASE_PATH)
 
             # baseエンコードされた画像を値、日付をキーとするdictから情報を受け取ってhtml stringを作成してレンダリングする
             render_sampling_img(b64_img_dict, sampling_df, title, 5)
 
+    
+    # -------テストコード-------
+    st.markdown('---')
+    st.markdown('---')
+    st.markdown('---')
 
-    # col1, col2, col3 = st.beta_columns(3)
 
-    # with col1:
-    #     st.header("A cat")
-    #     st.image("https://static.streamlit.io/examples/cat.jpg", use_column_width=True)
+    # 画像表示部
+    # ポジティブデータとネガティブデータに分割して、サンプリングした画像データを表示
+    for df in data_dfs:
+        if len(df)==0: continue # 念の為
 
-    # with col2:
-    #     st.header("A dog")
-    #     st.image("https://static.streamlit.io/examples/dog.jpg", use_column_width=True)
+        # 漁に行かなかったデータ以外を持ってくる(つまり、漁に行かなかったデータを除外する)
+        droped_df = df[df['水揚量']!=-1]
 
-    # with col3:
-    #     st.header("An owl")
-    #     st.image("https://static.streamlit.io/examples/owl.jpg", use_column_width=True)
-    #     if st.button('Say hello'):
-    #         st.write('Why hello there')
-    #     else:
-    #         st.write('gg')
+        # 水揚量で閾値を境に、ポジティブネガティブに2分割する
+        positive_df, negative_df = divide_pn_df(droped_df, '水揚量', threshold)
+
+        # 日付でソートして、n_samples分区切って、区切った点をサンプリングしてくる
+        p_sampling_df = sampling_data(positive_df, n_samples)
+        n_sampling_df = sampling_data(negative_df, n_samples)
+        
+        # サンプリングされてきた画像表示部分 HACK: ここら辺、近傍でも似た処理するのでうまく関数化できそう(ボタンの処理が面倒ではある)
+        for i, sampling_df in enumerate([p_sampling_df, n_sampling_df]):
+            if i==0: # ポジティブデータなら
+                title = f'{df["場所"][0]} {df["漁業種類"][0]} {df["魚種"][0]} ポジティブデータ'
+            else:
+                title = f'{df["場所"][0]} {df["漁業種類"][0]} {df["魚種"][0]} ネガティブデータ'
+
+            st.markdown('---')
+            st.write(title)
+
+            b64_img_dict = get_img_dict(sampling_df['日付'], DATABASE_PATH)
+
+            # n_col列ごとに改行したい
+            N_COL, col_no = 6, 0
+            for j, (k, v) in enumerate(b64_img_dict.items()):
+                if col_no%N_COL==0: # N_COL列ごとに改行を行う
+                    col_obj_ls = st.beta_columns(N_COL)
+                col_no = col_no%N_COL # 改行に合わせてカラムのナンバーを合わせる
+
+                print(j, k, sampling_df['場所'].values[0])
+                with col_obj_ls[col_no]:
+                    html_text = f'<img src="{v}" width="110" height="150"/>'
+                    components.html(html_text, width=120, height=170)
+
+                    st.write(f'日付: {k}')
+                    st.write(f'漁獲量: {int(sampling_df[sampling_df["日付"]==k]["水揚量"].values[0])}(kg)')
+
+                    if st.button(f'{title}{j}'):
+                        selected_date = k
+
+                col_no+=1
+
+            try: # ボタンが押された時だけ作動 似ている画像を表示                
+                st.markdown(f'# {selected_date}の画像を選択！')
+                
+                html_text = f'<img src="{b64_img_dict[selected_date]}" width="300" height="350"/>'
+                components.html(html_text, width=310, height=370)
+
+                # 近傍の画像の日付を取得、それと対応するpd.DataFrameを取得する
+                nn_dates = img_group_dict[f'{selected_date}:group_date']
+                nn_df = df[df['日付'].isin(nn_dates)]
+
+                # 近傍データを漁に行かなかったデータを除外してと、漁に行ったデータを分離する
+                removed_nn_df = nn_df[nn_df['水揚量']==-1]
+                nn_df = nn_df[nn_df['水揚量']!=-1]
+
+                # 漁に行った近傍データをポジティブ・ネガティブに分離する
+                positive_nn_df, negative_nn_df = divide_pn_df(nn_df, '水揚量', threshold)
+
+                for i, sampling_df in enumerate([positive_nn_df, negative_nn_df, removed_nn_df]):
+                    if i==0: # ポジティブデータなら
+                        title = f'{df["場所"][0]} {df["漁業種類"][0]} {df["魚種"][0]} 近傍ポジティブデータ'
+                    elif i==1: # ネガティブデータなら
+                        title = f'{df["場所"][0]} {df["漁業種類"][0]} {df["魚種"][0]} 近傍ネガティブデータ'
+                    else:
+                        title = f'{df["場所"][0]} {df["漁業種類"][0]} {df["魚種"][0]} 近傍漁に行かなかったデータ'
+
+                    st.markdown('---')
+                    st.write(title)
+
+                    b64_img_dict = get_img_dict(sampling_df['日付'], DATABASE_PATH)
+
+                    # n_col列ごとに改行したい
+                    N_COL, col_no = 10, 0
+                    for j, (k, v) in enumerate(b64_img_dict.items()):
+                        if col_no%N_COL==0: # N_COL列ごとに改行を行う
+                            col_obj_ls = st.beta_columns(N_COL)
+                        col_no = col_no%N_COL # 改行に合わせてカラムのナンバーを合わせる
+
+                        print(j, k, sampling_df['場所'].values[0])
+                        with col_obj_ls[col_no]:
+                            html_text = f'<img src="{v}" width="80" height="120"/>'
+                            components.html(html_text, width=90, height=140)
+
+                            st.write(f'日付: {k}')
+                            st.write(f'漁獲量: {int(sampling_df[sampling_df["日付"]==k]["水揚量"].values[0])}(kg)')
+
+                        col_no+=1
+
+                del selected_date # 同じ動作を繰り返さないように未定義にする
+
+            except NameError: # ボタンが押されてない時は未定義なので何もしない
+                pass
+
+
+
+    st.balloons()
+    st.error('This is an error')
+    st.warning('This is a warning')
+    st.info('This is a purely informational message')
+    st.success('This is a success message!')
+
+
+    placeholder = st.empty()
+    placeholder.text("Hello")
+    placeholder.line_chart({"data": [1, 5, 2, 6]})
+
+    col1, col2, col3, col4, col5, col6, col7 = st.beta_columns(7)
+
+    with col1:
+        st.header("A cat")
+        st.image("https://static.streamlit.io/examples/cat.jpg", use_column_width=True)
+
+    with col2:
+        st.header("A dog")
+        st.image("https://static.streamlit.io/examples/dog.jpg", use_column_width=True)
+
+    with col3:
+        st.header("An owl")
+        st.write('the GREATEST HERO of China')
+        st.header("An owl2")
+        st.image("https://static.streamlit.io/examples/owl.jpg", use_column_width=True)
+        if st.button('Say hello'):
+            st.write('Why hello there')
+        else:
+            st.write('gg')
+
+    with col4:
+        st.header("An owl")
+        st.write('the GREATEST HERO of China')
+        st.header("An owl2")
+        st.image("https://static.streamlit.io/examples/owl.jpg", use_column_width=True)
+        if st.button('Say hello4'):
+            st.write('Why hello there4')
+        else:
+            st.write('gg')
+    with col5:
+        st.header("An owl")
+        st.write('the GREATEST HERO of China')
+        # st.header("An owl2")
+        # st.image("https://static.streamlit.io/examples/owl.jpg", use_column_width=True)
+        if st.button('Say hello5'):
+            st.write('Why hello there5')
+        else:
+            st.write('gg')
+    with col6:
+        st.header("An owl")
+        st.write('the GREATEST HERO of China')
+        st.header("An owl2")
+        st.image("https://static.streamlit.io/examples/owl.jpg", use_column_width=True)
+        if st.button('Say hello6'):
+            st.write('Why hello there6')
+            st.image("https://static.streamlit.io/examples/owl.jpg", use_column_width=True)
+
+        else:
+            st.write('gg')
+    with col6:
+        st.header("An owl")
+        st.write('the GREATEST HERO of China')
+        st.header("An owl2")
+        for i in range(5):
+            st.image(["https://static.streamlit.io/examples/owl.jpg"], use_column_width=True)
+            st.write(f'image{i+1}!')
+        if st.button('Say hello7'):
+            st.write('Why hello there7')
+            st.image("https://static.streamlit.io/examples/owl.jpg", use_column_width=True)
+
+        else:
+            st.write('gg')
 
 
 
