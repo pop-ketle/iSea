@@ -8,13 +8,23 @@ import numpy as np
 import pandas as pd
 import configparser
 from PIL import Image
-import streamlit as st
-import streamlit.components.v1 as components
 from datetime import datetime as dt
 from datetime import timedelta
 from datetime import time
 
 import plotly.graph_objs as go
+
+import streamlit as st
+import streamlit.components.v1 as components
+from streamlit.hashing import _CodeHasher
+try:
+    # Before Streamlit 0.65
+    from streamlit.ReportThread import get_report_ctx
+    from streamlit.server.Server import Server
+except ModuleNotFoundError:
+    # After Streamlit 0.65
+    from streamlit.report_thread import get_report_ctx
+    from streamlit.server.server import Server
 
 
 def daterange(_start, _end):
@@ -193,7 +203,6 @@ def render_sampling_img(img_dict, df, title, n_col):
     """
     html_text += '<tbody> <form action="/" method="POST" enctype="multipart/form-data" target="_blank" name="select_image">'
     for i, (k, v) in enumerate(img_dict.items()):
-        print(k, i)
         # 日付と画像の紐づいたボタンを作るhtml stringを書く
         if i!=0 and i%n_col==0: # テーブルを改行する
             html_text += '<tr>'
@@ -213,6 +222,46 @@ def render_sampling_img(img_dict, df, title, n_col):
             html_text +='</tr>'
     html_text += '</form></tbody></table>'
     components.html(html_text, width=1200, height=220*math.ceil(len(img_dict)/n_col), scrolling=True)
+
+# @st.cache(suppress_st_warning=True)
+def render_nn_img(df, title, n_col, DATABASE_PATH):
+    '''与えられたdfと対応する画像を表示する
+    Args:
+        df(pd.DataFrame): 近傍データのpd.DataFrame
+        title(str): 表題のタイトル(テーブルみたいに並べるので、そこの名前にする)
+        n_col(int): テーブルの横の列数
+        DATABASE_PATH(str): データ保管所のパス(基本 '../datasets/')
+    Returns:
+        selected_date(None or str): Noneか、ボタンが押されたらその日の日付
+        b64_img_dict(dict): 日付がキー、その日のbase64エンコードされた画像が値のdict
+    '''
+    st.markdown('---')
+    st.write(title)
+
+    b64_img_dict = get_img_dict(df['日付'], DATABASE_PATH)
+
+    # 列数n_colのテーブルのようにデータを並べる
+    col_no, selected_date = 0, None
+    for i, (k, v) in enumerate(b64_img_dict.items()):
+        if col_no%n_col==0: # n_col列ごとに改行(新しくカラムを生成する)を行う
+            col_obj_ls = st.beta_columns(n_col)
+        col_no = col_no%n_col # 改行に合わせてカラムのナンバーの調整
+
+        with col_obj_ls[col_no]:
+            html_text = f'<img src="{v}" width="110" height="150"/>'
+            components.html(html_text, width=120, height=170)
+
+            button_text = f'''
+                日付: {k} \n
+                漁獲量: {int(df[df["日付"]==k]["水揚量"].values[0])}(kg)
+            '''
+            st.write(button_text)
+
+            if st.button(f'選択: {i}', key=f'{title}{i}'):
+                selected_date = k
+
+        col_no+=1
+    return selected_date, b64_img_dict
 
 
 def main():
@@ -250,7 +299,7 @@ def main():
     np.set_printoptions(suppress=True) # 指数表記にしない
     st.set_page_config(page_title='iSea: 海況と漁獲データの結びつけによる関連性の可視化', page_icon=None, layout='wide', initial_sidebar_state='auto')
     st.title('iSea: 海況と漁獲データの結びつけによる関連性の可視化')
-    st.write(f'{min_date_str}~{max_date_str} までの期間のデータを対象とします')
+    st.write(f'{min_date_str}~{max_date_str} までの期間のデータを対象とします。')
 
     print('============== Initialized ==============')
 
@@ -387,88 +436,71 @@ def main():
             else:
                 title = f'{df["場所"][0]} {df["漁業種類"][0]} {df["魚種"][0]} ネガティブデータ'
 
-            st.markdown('---')
-            st.write(title)
+            # TODO: 
+            # 画像をn_col列のテーブル形式のように表示する
+            global selected_date
+            selected_date, b64_img_dict = render_nn_img(sampling_df, title, 6, DATABASE_PATH)
+            print('0', selected_date)
 
-            b64_img_dict = get_img_dict(sampling_df['日付'], DATABASE_PATH)
+            # try: # ボタンが押された時だけ(selected_dateが定義されてる時だけ)作動 似ている画像を表示
+            # 選択された日付がNoneなら処理を飛ばす
+            if selected_date is None: continue
 
-            # n_col列ごとに改行したい
-            N_COL, col_no = 6, 0
-            for j, (k, v) in enumerate(b64_img_dict.items()):
-                if col_no%N_COL==0: # N_COL列ごとに改行を行う
-                    col_obj_ls = st.beta_columns(N_COL)
-                col_no = col_no%N_COL # 改行に合わせてカラムのナンバーを合わせる
+            st.markdown(f'# {selected_date}の画像を選択！')
+            
+            html_text = f'<img src="{b64_img_dict[selected_date]}" width="300" height="350"/>'
+            components.html(html_text, width=310, height=370)
 
-                print(j, k, sampling_df['場所'].values[0])
-                with col_obj_ls[col_no]:
-                    html_text = f'<img src="{v}" width="110" height="150"/>'
-                    components.html(html_text, width=120, height=170)
+            # 近傍の画像の日付を取得、それと対応するpd.DataFrameを取得する
+            nn_dates = img_group_dict[f'{selected_date}:group_date']
+            nn_df = df[df['日付'].isin(nn_dates)]
 
-                    # st.write(f'日付: {k}')
-                    # st.write(f'漁獲量: {int(sampling_df[sampling_df["日付"]==k]["水揚量"].values[0])}(kg)')
+            # 近傍データを漁に行かなかったデータを除外してと、漁に行ったデータを分離する
+            removed_nn_df = nn_df[nn_df['水揚量']==-1]
+            nn_df = nn_df[nn_df['水揚量']!=-1]
 
-                    button_text = f'''
-                        日付: {k} \n
-                        漁獲量: {int(sampling_df[sampling_df["日付"]==k]["水揚量"].values[0])}(kg)
-                    '''
-                    st.write(button_text)
+            # 漁に行った近傍データをポジティブ・ネガティブに分離する
+            positive_nn_df, negative_nn_df = divide_pn_df(nn_df, '水揚量', threshold)
 
-                    if st.button(f'選択: {j}', key=f'{title}{j}'):
-                        selected_date = k
+            for i, sampling_df in enumerate([positive_nn_df, negative_nn_df, removed_nn_df]):
+                if i==0: # ポジティブデータなら
+                    title = f'{df["場所"][0]} {df["漁業種類"][0]} {df["魚種"][0]} 近傍ポジティブデータ'
+                elif i==1: # ネガティブデータなら
+                    title = f'{df["場所"][0]} {df["漁業種類"][0]} {df["魚種"][0]} 近傍ネガティブデータ'
+                else:
+                    title = f'{df["場所"][0]} {df["漁業種類"][0]} {df["魚種"][0]} 近傍漁に行かなかったデータ'
 
-                col_no+=1
+                # 画像をn_col列のテーブル形式のように表示する
+                print('1', selected_date)
+                nn_selected_date, b64_img_dict = render_nn_img(sampling_df, title, 10, DATABASE_PATH)
+                print('2', selected_date, nn_selected_date)
 
-            try: # ボタンが押された時だけ作動 似ている画像を表示                
-                st.markdown(f'# {selected_date}の画像を選択！')
-                
-                html_text = f'<img src="{b64_img_dict[selected_date]}" width="300" height="350"/>'
-                components.html(html_text, width=310, height=370)
+            #         st.markdown('---')
+            #         st.write(title)
 
-                # 近傍の画像の日付を取得、それと対応するpd.DataFrameを取得する
-                nn_dates = img_group_dict[f'{selected_date}:group_date']
-                nn_df = df[df['日付'].isin(nn_dates)]
+            #         b64_img_dict = get_img_dict(sampling_df['日付'], DATABASE_PATH)
 
-                # 近傍データを漁に行かなかったデータを除外してと、漁に行ったデータを分離する
-                removed_nn_df = nn_df[nn_df['水揚量']==-1]
-                nn_df = nn_df[nn_df['水揚量']!=-1]
+            #         # n_col列ごとに改行したい
+            #         N_COL, col_no = 10, 0
+            #         for j, (k, v) in enumerate(b64_img_dict.items()):
+            #             if col_no%N_COL==0: # N_COL列ごとに改行を行う
+            #                 col_obj_ls = st.beta_columns(N_COL)
+            #             col_no = col_no%N_COL # 改行に合わせてカラムのナンバーを合わせる
 
-                # 漁に行った近傍データをポジティブ・ネガティブに分離する
-                positive_nn_df, negative_nn_df = divide_pn_df(nn_df, '水揚量', threshold)
+            #             with col_obj_ls[col_no]:
+            #                 html_text = f'<img src="{v}" width="80" height="120"/>'
+            #                 components.html(html_text, width=90, height=140)
 
-                for i, sampling_df in enumerate([positive_nn_df, negative_nn_df, removed_nn_df]):
-                    if i==0: # ポジティブデータなら
-                        title = f'{df["場所"][0]} {df["漁業種類"][0]} {df["魚種"][0]} 近傍ポジティブデータ'
-                    elif i==1: # ネガティブデータなら
-                        title = f'{df["場所"][0]} {df["漁業種類"][0]} {df["魚種"][0]} 近傍ネガティブデータ'
-                    else:
-                        title = f'{df["場所"][0]} {df["漁業種類"][0]} {df["魚種"][0]} 近傍漁に行かなかったデータ'
+            #                 st.write(f'日付: {k}')
+            #                 st.write(f'漁獲量: {int(sampling_df[sampling_df["日付"]==k]["水揚量"].values[0])}(kg)')
 
-                    st.markdown('---')
-                    st.write(title)
+            #             col_no+=1
 
-                    b64_img_dict = get_img_dict(sampling_df['日付'], DATABASE_PATH)
+            #     # del selected_date # 同じ動作を繰り返さないように未定義にする
+            #     selected_date = None
 
-                    # n_col列ごとに改行したい
-                    N_COL, col_no = 10, 0
-                    for j, (k, v) in enumerate(b64_img_dict.items()):
-                        if col_no%N_COL==0: # N_COL列ごとに改行を行う
-                            col_obj_ls = st.beta_columns(N_COL)
-                        col_no = col_no%N_COL # 改行に合わせてカラムのナンバーを合わせる
-
-                        print(j, k, sampling_df['場所'].values[0])
-                        with col_obj_ls[col_no]:
-                            html_text = f'<img src="{v}" width="80" height="120"/>'
-                            components.html(html_text, width=90, height=140)
-
-                            st.write(f'日付: {k}')
-                            st.write(f'漁獲量: {int(sampling_df[sampling_df["日付"]==k]["水揚量"].values[0])}(kg)')
-
-                        col_no+=1
-
-                del selected_date # 同じ動作を繰り返さないように未定義にする
-
-            except NameError: # ボタンが押されてない時は未定義なので何もしない
-                pass
+            # # except NameError: # ボタンが押されてない時は未定義なので何もしない
+            # #     pass
 
 
 
