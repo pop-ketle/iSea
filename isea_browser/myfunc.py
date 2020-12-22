@@ -70,7 +70,7 @@ def get_fish_data(db_path, place, method, species, start, end):
                 else:
                     catch_dateidx = [0, i, date]
             else:
-                catch_dateidx = [int(data['水揚量']), i, date]
+                catch_dateidx = [int(str(data['水揚量']).replace(',','')), i, date] # データベースにint形で入れてた気がするけど、'2,234'みたいなのがあるので調整
         catch_dateidx_fishidx.append(catch_dateidx)
 
     # 漁獲量でソートした連番をつける

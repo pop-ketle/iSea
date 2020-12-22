@@ -354,7 +354,7 @@ def show_img_details():
     nn_imgs    = get_img_array(nn_dates)
     nn_catches = get_catch_array(nn_dates, place, method, species, DB_PATH)
     nn_dis     = [round(i, 2) for i in img_group_dict[f'{date}:group_dis']]
-    nn_data    = [[idx, imgs, int(catch), date, dis] for idx,imgs,catch,date,dis in zip(nn_idx, nn_imgs, nn_catches, nn_dates, nn_dis)]
+    nn_data    = [[idx, imgs, int(str(catch).replace(',', '')), date, dis] for idx,imgs,catch,date,dis in zip(nn_idx, nn_imgs, nn_catches, nn_dates, nn_dis)]
 
     seed_img, nn_data = [nn_data[0]], nn_data[1:] # 代表値(seed_img)と近傍(nn_data)を分離
     nn_data.sort(key=lambda x:x[2]) # 漁獲量でソート
