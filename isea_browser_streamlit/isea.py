@@ -274,8 +274,8 @@ def main():
     DB_PATH = config_ini['DEFAULT']['FISH_DB_PATH']
 
     # 漁港・漁業手法・魚種・画像の辞書形式のデータを読み込む
-    with open(DATABASE_PATH+'method_dict.pickle', 'rb') as f: methods_dict = pickle.load(f)
-    with open(DATABASE_PATH+'species_dict.pickle', 'rb') as f: species_dict = pickle.load(f)
+    with open(DATABASE_PATH+'method_dict.pkl', 'rb') as f: methods_dict = pickle.load(f)
+    with open(DATABASE_PATH+'species_dict.pkl', 'rb') as f: species_dict = pickle.load(f)
     with open(DATABASE_PATH+'group_dict.pkl', 'rb') as f: img_group_dict = pickle.load(f)
 
     # 文字列で表示するデータの開始と終了を定義 NOTE: 固定値になる気がするので大文字変数にした方がいいかも
