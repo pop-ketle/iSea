@@ -155,7 +155,7 @@ def render_nn_page(state):
 　　で使う。
     """
     uploaded_img = state.uploaded_img
-    
+
     st.markdown('# upload img')
     components.html(f'<img src="{uploaded_img}" width="320" height="400"/>', width=330, height=410)
 
@@ -186,7 +186,7 @@ if __name__ == "__main__":
     np.set_printoptions(suppress=True) # 指数表記にしない
     st.set_page_config(page_title='iSea: 海況と漁獲データの結びつけによる関連性の可視化', page_icon=None, layout='wide', initial_sidebar_state='auto')
     st.title('iSea: 海況と漁獲データの結びつけによる関連性の可視化')
-    st.write(f'{min_date_str}~{max_date_str} までの期間のデータを対象とします。')
+    st.write(f'{min_date_str}~{max_date_str} までの期間のデータを探索対象とします。')
     print('============== Initialized ==============')
 
     main()
