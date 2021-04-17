@@ -28,7 +28,7 @@
 
         <tbody>
         <tr>
-            <form action="/img_details" method="POST" enctype="multipart/form-data" name="select_metric">
+            <!-- <form action="/img_details" method="POST" enctype="multipart/form-data" name="select_metric">
                 類似度評価指標選択<p></p>
                 <input type="hidden" name="place" value="{{ place }}">
                 <input type="hidden" name="method" value="{{ method }}">
@@ -46,12 +46,8 @@
                     {% if sim_metric=="scaled_avg" %} <option value=scaled_avg selected>scaled_avg</option>
                     {% else %} <option value=scaled_avg>scaled_avg</option>{% endif %}
                 </select>
-                <!-- <label><input type="radio" name="metric" value="scaled_avg" checked>scaled_avg</label>
-                <label><input type="radio" name="metric" value="ssim">ssim</label>
-                <label><input type="radio" name="metric" value="psnr">psnr</label>
-                <label><input type="radio" name="metric" value="rmse">rmse</label> -->
                 <input type="submit" value="類似度指標決定">
-            </form>
+            </form> -->
         <tr>
 
         <p></p>

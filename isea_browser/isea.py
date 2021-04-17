@@ -601,10 +601,12 @@ def show_img_details():
                         message=f'[{place}-{method}-{species}]選択 (類似度はユークリッド距離で計算)',
                         place=place, method=method, species=species, date=date,
                         threshold=str(threshold),
-                        sim_metric=sim_metric,
+                        # sim_metric=sim_metric,
+                        sim_metric='scaled_avg',  # FIXME: 表示を消したいので仮置き
                         num_nn=20, plotly_div=plotly_div,
                         seed_img=seed_img,
-                        masked_img=simirality_masked_img,
+                        # masked_img=simirality_masked_img,
+                        masked_img=None, # FIXME: 表示を消したいので仮置き
                         positive_masked_img=positive_masked_img,
                         negative_masked_img=negative_masked_img,
                         # nn_upper_data=nn_upper_data,
@@ -626,8 +628,8 @@ if __name__ == "__main__":
     DB_PATH = config_ini['DEFAULT']['FISH_DB_PATH']
 
     # 漁港・漁業手法・魚種・画像の辞書形式のデータを読み込む
-    with open(DATABASE_PATH+'method_dict.pickle', 'rb') as f: methods_dict = pickle.load(f)
-    with open(DATABASE_PATH+'species_dict.pickle', 'rb') as f: species_dict = pickle.load(f)
+    with open(DATABASE_PATH+'method_dict.pkl', 'rb') as f: methods_dict = pickle.load(f)
+    with open(DATABASE_PATH+'species_dict.pkl', 'rb') as f: species_dict = pickle.load(f)
     with open(DATABASE_PATH+'group_dict.pkl', 'rb') as f: img_group_dict = pickle.load(f)
 
     np.set_printoptions(suppress=True) # 指数表記にしない
